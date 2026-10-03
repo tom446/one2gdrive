@@ -1,11 +1,10 @@
 name: OneDrive to Google Drive Sync
 
 on:
-  workflow_dispatch: # 允许你在网页上手动点按钮启动
-schedule:
-    # 每天 UTC 时间 20:00（即北京时间凌晨 04:00）自动执行一次增量同步
+  workflow_dispatch:
+  schedule:
     - cron: '0 20 * * *'
-    
+
 jobs:
   cloud_sync:
     runs-on: ubuntu-latest
@@ -15,7 +14,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rclone
 
-      - name: Setup Config
+      - name: Restore Rclone Config
         run: |
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 -d > ~/.config/rclone/rclone.conf
