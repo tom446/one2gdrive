@@ -22,8 +22,8 @@ jobs:
 
       - name: Sync one1 to Google Drive
         run: |
-          rclone copy one1: gdrive: -v --stats 15s
+          rclone copy one1:/ gdrive:/ -v --stats 15s --fast-list
 
       - name: Sync one2 to Google Drive
         run: |
-          rclone copy one2: gdrive: -v --stats 15s --ignore-existing
+          rclone copy one2:/ gdrive:/ -v --stats 15s --fast-list --ignore-existing
