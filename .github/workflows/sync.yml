@@ -1,0 +1,26 @@
+name: OneDrive to Google Drive Sync
+
+on:
+  workflow_dispatch: # 允许你在网页上手动点按钮启动
+
+jobs:
+  cloud_sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone
+
+      - name: Setup Config
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Sync one1 to Google Drive
+        run: |
+          rclone copy one1: gdrive: -v --stats 15s
+
+      - name: Sync one2 to Google Drive
+        run: |
+          rclone copy one2: gdrive: -v --stats 15s --ignore-existing
