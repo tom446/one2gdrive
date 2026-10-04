@@ -9,10 +9,9 @@ jobs:
   cloud_sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Rclone
+      - name: Install Latest Rclone
         run: |
-          sudo apt-get update
-          sudo apt-get install -y rclone
+          sudo -v ; curl https://rclone.org/install.sh | sudo bash
 
       - name: Restore Rclone Config
         run: |
@@ -23,22 +22,22 @@ jobs:
         run: |
           rclone copy one1:/ gdrive:/ -v --stats 15s --fast-list \
             --exclude "Personal Vault/**" \
-            --drive-chunk-size 16M \
-            --buffer-size 64M \
-            --onedrive-no-versions \
+            --order-by size,asc \
+            --transfers 4 \
+            --checkers 8 \
+            --retries 5 \
+            --low-level-retries 10 \
             --timeout 3m \
-            --contimeout 30s \
-            --transfers 2 \
-            --checkers 8
+            --contimeout 30s
 
       - name: Sync one2 to Google Drive
         run: |
           rclone copy one2:/ gdrive:/ -v --stats 15s --fast-list --ignore-existing \
             --exclude "Personal Vault/**" \
-            --drive-chunk-size 16M \
-            --buffer-size 64M \
-            --onedrive-no-versions \
+            --order-by size,asc \
+            --transfers 4 \
+            --checkers 8 \
+            --retries 5 \
+            --low-level-retries 10 \
             --timeout 3m \
-            --contimeout 30s \
-            --transfers 2 \
-            --checkers 8
+            --contimeout 30s
