@@ -21,8 +21,22 @@ jobs:
 
       - name: Sync one1 to Google Drive
         run: |
-          rclone copy one1:/ gdrive:/ -v --stats 15s --fast-list
+          rclone copy one1:/ gdrive:/ -v --stats 15s --fast-list \
+            --drive-chunk-size 64M \
+            --onedrive-chunk-size 64M \
+            --timeout 2m \
+            --contimeout 30s \
+            --low-level-retries 10 \
+            --retries 3 \
+            --transfers 4
 
       - name: Sync one2 to Google Drive
         run: |
-          rclone copy one2:/ gdrive:/ -v --stats 15s --fast-list --ignore-existing
+          rclone copy one2:/ gdrive:/ -v --stats 15s --fast-list --ignore-existing \
+            --drive-chunk-size 64M \
+            --onedrive-chunk-size 64M \
+            --timeout 2m \
+            --contimeout 30s \
+            --low-level-retries 10 \
+            --retries 3 \
+            --transfers 4
