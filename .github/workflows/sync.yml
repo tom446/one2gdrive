@@ -23,20 +23,26 @@ jobs:
           rclone copy one1:/ gdrive:/ -v --stats 15s --fast-list \
             --exclude "Personal Vault/**" \
             --exclude "rar/ai/d/file/imgofai.zip" \
+            --order-by size,asc \
             --transfers 4 \
             --checkers 8 \
-            --retries 5 \
+            --drive-chunk-size 32M \
+            --timeout 1m \
+            --contimeout 20s \
             --low-level-retries 10 \
-            --timeout 3m \
-            --contimeout 30s
+            --retries 5 \
+            --tpslimit 10
 
       - name: Sync one2 to Google Drive
         run: |
           rclone copy one2:/ gdrive:/ -v --stats 15s --fast-list --ignore-existing \
             --exclude "Personal Vault/**" \
+            --order-by size,asc \
             --transfers 4 \
             --checkers 8 \
-            --retries 5 \
+            --drive-chunk-size 32M \
+            --timeout 1m \
+            --contimeout 20s \
             --low-level-retries 10 \
-            --timeout 3m \
-            --contimeout 30s
+            --retries 5 \
+            --tpslimit 10
