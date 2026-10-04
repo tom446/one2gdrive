@@ -1,13 +1,13 @@
 name: Split and Sync 51GB Large File
 
 on:
-  workflow_dispatch: # 仅手动点击触发
+  workflow_dispatch:
 
 jobs:
   split_and_upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Rclone
+      - name: Install Latest Rclone
         run: |
           sudo -v ; curl https://rclone.org/install.sh | sudo bash
 
@@ -16,43 +16,53 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-      - name: Clean disk space for safe buffering
-        run: |
-          # 清理虚拟机自带的无用开发工具链，腾出额外 20GB+ 干净空间
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
-          df -h
-
-      - name: Stream Split and Sequential Upload
+      - name: Download & Upload Chunk by Chunk
         run: |
           set -e
-          
-          # 创建临时工作区
-          WORKDIR="/tmp/split_stream"
+
+          WORKDIR="/tmp/rclone_chunks"
           mkdir -p "$WORKDIR"
           cd "$WORKDIR"
-          
+
           TARGET_DIR="rar/ai/d/file/imgofai_split"
-          CHUNK_SIZE="9G" # 每次生成 9GB 碎片，安全受控
-          
-          echo "=== 1. 开始流式拉取并分卷保存 ==="
-          # 使用 rclone cat 将远端文件输出为标准数据流，通过 split 切割为 9GB 一块的前缀为 part_ 的分卷
-          rclone cat "one1:rar/ai/d/file/imgofai.zip" | split -b $CHUNK_SIZE -d -a 2 - "part_"
-          
-          echo "=== 2. 分卷列表 ==="
-          ls -lh
-          
-          echo "=== 3. 逐个分卷上传至 Google Drive 并即时销毁 ==="
-          for file in part_*; do
-            if [ -f "$file" ]; then
-              echo ">>> 正在上传分片: $file 到 gdrive:$TARGET_DIR/ ..."
-              rclone copy "$file" "gdrive:$TARGET_DIR/" -v --stats 15s --drive-chunk-size 32M
-              
-              echo ">>> 上传完成，立即删除本地分片 $file 以释放磁盘空间"
-              rm -f "$file"
-              df -h /
+          SRC_FILE="one1:rar/ai/d/file/imgofai.zip"
+
+          # 51.288 GiB ≈ 55,070,000,000 字节，每片切 8GB (8589934592 字节)，共需 7 片 (0 到 6)
+          CHUNK_BYTES=8589934592
+          TOTAL_CHUNKS=7
+
+          for i in $(seq 0 $((TOTAL_CHUNKS - 1))); do
+            START_BYTE=$((i * CHUNK_BYTES))
+            END_BYTE=$(((i + 1) * CHUNK_BYTES - 1))
+            PART_NAME=$(printf "part_%02d" $i)
+
+            echo "=========================================="
+            echo ">>> 正在处理分片: $PART_NAME (字节范围: $START_BYTE - $END_BYTE)"
+            echo "=========================================="
+
+            # 1. 精确拉取当前 8GB 片段落盘
+            echo "--- 正在从 OneDrive 下载当前切片 ---"
+            rclone cat "$SRC_FILE" --offset $START_BYTE --count $CHUNK_BYTES > "$PART_NAME"
+
+            # 检查文件是否为空（传到末尾）
+            if [ ! -s "$PART_NAME" ]; then
+              echo "已到达文件末尾，清除空片段。"
+              rm -f "$PART_NAME"
+              break
             fi
+
+            ls -lh "$PART_NAME"
+
+            # 2. 上传当前分片至 Google Drive
+            echo "--- 正在上传当前切片至 Google Drive ---"
+            rclone copy "$PART_NAME" "gdrive:$TARGET_DIR/" -v --stats 15s --drive-chunk-size 32M
+
+            # 3. 立即删除本地切片释放磁盘
+            echo "--- 上传完成，立即销毁本地切片释放磁盘 ---"
+            rm -f "$PART_NAME"
+            df -h /
           done
-          
-          echo "=== 4. 传输校验 ==="
+
+          echo "=== 所有分片处理完毕，执行最终校验 ==="
           rclone ls "gdrive:$TARGET_DIR/"
-          echo "51GB 大文件分卷上传全部成功！"
+          echo "51GB 大文件分卷上传成功！"
