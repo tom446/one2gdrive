@@ -1,0 +1,58 @@
+name: Split and Sync 51GB Large File
+
+on:
+  workflow_dispatch: # 仅手动点击触发
+
+jobs:
+  split_and_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Rclone
+        run: |
+          sudo -v ; curl https://rclone.org/install.sh | sudo bash
+
+      - name: Restore Rclone Config
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Clean disk space for safe buffering
+        run: |
+          # 清理虚拟机自带的无用开发工具链，腾出额外 20GB+ 干净空间
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          df -h
+
+      - name: Stream Split and Sequential Upload
+        run: |
+          set -e
+          
+          # 创建临时工作区
+          WORKDIR="/tmp/split_stream"
+          mkdir -p "$WORKDIR"
+          cd "$WORKDIR"
+          
+          TARGET_DIR="rar/ai/d/file/imgofai_split"
+          CHUNK_SIZE="9G" # 每次生成 9GB 碎片，安全受控
+          
+          echo "=== 1. 开始流式拉取并分卷保存 ==="
+          # 使用 rclone cat 将远端文件输出为标准数据流，通过 split 切割为 9GB 一块的前缀为 part_ 的分卷
+          rclone cat "one1:rar/ai/d/file/imgofai.zip" | split -b $CHUNK_SIZE -d -a 2 - "part_"
+          
+          echo "=== 2. 分卷列表 ==="
+          ls -lh
+          
+          echo "=== 3. 逐个分卷上传至 Google Drive 并即时销毁 ==="
+          for file in part_*; do
+            if [ -f "$file" ]; then
+              echo ">>> 正在上传分片: $file 到 gdrive:$TARGET_DIR/ ..."
+              rclone copy "$file" "gdrive:$TARGET_DIR/" -v --stats 15s --drive-chunk-size 32M
+              
+              echo ">>> 上传完成，立即删除本地分片 $file 以释放磁盘空间"
+              rm -f "$file"
+              df -h /
+            fi
+          done
+          
+          echo "=== 4. 传输校验 ==="
+          rclone ls "gdrive:$TARGET_DIR/"
+          echo "51GB 大文件分卷上传全部成功！"
